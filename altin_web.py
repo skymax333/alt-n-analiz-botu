@@ -1,7 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 st.set_page_config(
@@ -14,9 +14,87 @@ st.title("🟡 ALTIN ANALİZ BOTU")
 st.caption("Altın (GC=F) • Ons altın vadeli fiyat analizi")
 
 
+# =========================
+# PİYASA DURUMU
+# =========================
+
+def piyasa_durumu():
+
+    turkiye = ZoneInfo("Europe/Istanbul")
+    chicago = ZoneInfo("America/Chicago")
+
+    simdi_tr = datetime.now(turkiye)
+    simdi_ct = simdi_tr.astimezone(chicago)
+
+    gun = simdi_ct.weekday()
+    saat = simdi_ct.hour + simdi_ct.minute / 60
+
+    # Cumartesi
+    if gun == 5:
+        return "KAPALI", simdi_tr, "Pazar 01:00 civarında açılması bekleniyor."
+
+    # Pazar
+    if gun == 6:
+        if saat < 17:
+            return "KAPALI", simdi_tr, "Pazar 17:00 CT'de açılır."
+        else:
+            return "AÇIK", simdi_tr, "Piyasa açık."
+
+    # Pazartesi - Perşembe
+    if gun in [0, 1, 2, 3]:
+
+        # Günlük bakım arası
+        if 16 <= saat < 17:
+            return "KAPALI", simdi_tr, "Günlük bakım arası. 17:00 CT'de tekrar açılır."
+
+        return "AÇIK", simdi_tr, "Piyasa açık."
+
+    # Cuma
+    if gun == 4:
+
+        if saat >= 16:
+            return "KAPALI", simdi_tr, "Hafta sonu nedeniyle piyasa kapandı."
+
+        if saat < 16:
+            return "AÇIK", simdi_tr, "Piyasa açık."
+
+    return "KAPALI", simdi_tr, "Piyasa kapalı."
+
+
+durum, turkiye_saati, durum_aciklama = piyasa_durumu()
+
+
+# =========================
+# EKRANDA PİYASA DURUMU
+# =========================
+
+st.subheader("📈 Piyasa Durumu")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if durum == "AÇIK":
+        st.success("🟢 PİYASA AÇIK")
+    else:
+        st.error("🔴 PİYASA KAPALI")
+
+with col2:
+    st.info(
+        "🇹🇷 Türkiye saati: "
+        + turkiye_saati.strftime("%d.%m.%Y %H:%M:%S")
+    )
+
+st.caption(durum_aciklama)
+
+
+# =========================
+# ALTIN ANALİZİ
+# =========================
+
 def analiz_yap():
 
     try:
+
         altin = yf.download(
             "GC=F",
             period="5d",
@@ -73,6 +151,8 @@ def analiz_yap():
         tablo["Açılış"] = tablo["Açılış"].round(2)
         tablo["Ortalama"] = tablo["Ortalama"].round(2)
 
+        st.subheader("📊 Altın Analizi")
+
         st.dataframe(
             tablo.tail(20),
             use_container_width=True,
@@ -95,10 +175,6 @@ def analiz_yap():
             f"{son['Altın Fiyatı']:.2f} USD/ons"
         )
 
-        turkiye_saati = datetime.now(
-            ZoneInfo("Europe/Istanbul")
-        )
-
         st.caption(
             "Son güncelleme: "
             + turkiye_saati.strftime("%d.%m.%Y %H:%M:%S")
@@ -106,14 +182,20 @@ def analiz_yap():
         )
 
         st.info(
-            "Not: GC=F, Yahoo Finance üzerindeki altın vadeli işlem verisidir. "
-            "Sinyaller teknik analiz amaçlıdır ve yatırım tavsiyesi değildir."
+            "ℹ️ GC=F, Yahoo Finance üzerindeki altın vadeli işlem verisidir. "
+            "AL/SAT/BEKLE sinyalleri teknik analiz amaçlıdır; "
+            "yatırım tavsiyesi değildir."
         )
 
     except Exception as hata:
+
         st.error("Veri alınırken hata oluştu.")
         st.code(str(hata))
 
+
+# =========================
+# YENİLEME
+# =========================
 
 if st.button("🔄 VERİYİ YENİLE"):
     st.rerun()
