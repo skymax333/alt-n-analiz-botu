@@ -29,43 +29,119 @@ def piyasa_durumu():
     gun = simdi_ct.weekday()
     saat = simdi_ct.hour + simdi_ct.minute / 60
 
-    # Cumartesi
-    if gun == 5:
-        return "KAPALI", simdi_tr, "Pazar 01:00 civarında açılması bekleniyor."
+    acilis = None
+    kapanis = None
 
-    # Pazar
+    # PAZAR
     if gun == 6:
+
         if saat < 17:
-            return "KAPALI", simdi_tr, "Pazar 17:00 CT'de açılır."
+            durum = "KAPALI"
+
+            acilis = simdi_ct.replace(
+                hour=17, minute=0, second=0, microsecond=0
+            )
+
         else:
-            return "AÇIK", simdi_tr, "Piyasa açık."
+            durum = "AÇIK"
 
-    # Pazartesi - Perşembe
-    if gun in [0, 1, 2, 3]:
+            kapanis = simdi_ct + timedelta(days=1)
+            kapanis = kapanis.replace(
+                hour=16, minute=0, second=0, microsecond=0
+            )
 
-        # Günlük bakım arası
-        if 16 <= saat < 17:
-            return "KAPALI", simdi_tr, "Günlük bakım arası. 17:00 CT'de tekrar açılır."
-
-        return "AÇIK", simdi_tr, "Piyasa açık."
-
-    # Cuma
-    if gun == 4:
-
-        if saat >= 16:
-            return "KAPALI", simdi_tr, "Hafta sonu nedeniyle piyasa kapandı."
+    # PAZARTESİ - PERŞEMBE
+    elif gun in [0, 1, 2, 3]:
 
         if saat < 16:
-            return "AÇIK", simdi_tr, "Piyasa açık."
 
-    return "KAPALI", simdi_tr, "Piyasa kapalı."
+            durum = "AÇIK"
+
+            kapanis = simdi_ct.replace(
+                hour=16, minute=0, second=0, microsecond=0
+            )
+
+        elif saat < 17:
+
+            durum = "KAPALI"
+
+            acilis = simdi_ct.replace(
+                hour=17, minute=0, second=0, microsecond=0
+            )
+
+        else:
+
+            durum = "AÇIK"
+
+            kapanis = simdi_ct + timedelta(days=1)
+            kapanis = kapanis.replace(
+                hour=16, minute=0, second=0, microsecond=0
+            )
+
+    # CUMA
+    elif gun == 4:
+
+        if saat < 16:
+
+            durum = "AÇIK"
+
+            kapanis = simdi_ct.replace(
+                hour=16, minute=0, second=0, microsecond=0
+            )
+
+        else:
+
+            durum = "KAPALI"
+
+            gun_sayisi = 2
+
+            acilis = simdi_ct + timedelta(days=gun_sayisi)
+            acilis = acilis.replace(
+                hour=17, minute=0, second=0, microsecond=0
+            )
+
+    # CUMARTESİ
+    else:
+
+        durum = "KAPALI"
+
+        acilis = simdi_ct + timedelta(days=1)
+        acilis = acilis.replace(
+            hour=17, minute=0, second=0, microsecond=0
+        )
+
+    # Geri sayım
+    hedef = kapanis if durum == "AÇIK" else acilis
+
+    kalan = hedef - simdi_ct
+
+    toplam_saniye = max(0, int(kalan.total_seconds()))
+
+    gun_sayisi = toplam_saniye // 86400
+    saat_sayisi = (toplam_saniye % 86400) // 3600
+    dakika_sayisi = (toplam_saniye % 3600) // 60
+
+    geri_sayim = (
+        f"{gun_sayisi} gün "
+        f"{saat_sayisi} saat "
+        f"{dakika_sayisi} dakika"
+    )
+
+    hedef_tr = hedef.astimezone(turkiye)
+
+    return (
+        durum,
+        simdi_tr,
+        geri_sayim,
+        hedef_tr
+    )
 
 
-durum, turkiye_saati, durum_aciklama = piyasa_durumu()
+durum, turkiye_saati, geri_sayim, hedef_tr = piyasa_durumu()
 
 
 # =========================
-# EKRANDA PİYASA DURUMU
+# PİYASA DURUMU EKRANI
 # =========================
 
 st.subheader("📈 Piyasa Durumu")
@@ -73,18 +149,46 @@ st.subheader("📈 Piyasa Durumu")
 col1, col2 = st.columns(2)
 
 with col1:
+
     if durum == "AÇIK":
         st.success("🟢 PİYASA AÇIK")
     else:
         st.error("🔴 PİYASA KAPALI")
 
+
 with col2:
+
     st.info(
         "🇹🇷 Türkiye saati: "
         + turkiye_saati.strftime("%d.%m.%Y %H:%M:%S")
     )
 
-st.caption(durum_aciklama)
+
+if durum == "AÇIK":
+
+    st.write(
+        "⏳ Kapanışa kalan süre:",
+        f"*{geri_sayim}*"
+    )
+
+    st.caption(
+        "Kapanış: "
+        + hedef_tr.strftime("%d.%m.%Y %H:%M")
+        + " (Türkiye saati)"
+    )
+
+else:
+
+    st.write(
+        "⏳ Açılışa kalan süre:",
+        f"*{geri_sayim}*"
+    )
+
+    st.caption(
+        "Açılış: "
+        + hedef_tr.strftime("%d.%m.%Y %H:%M")
+        + " (Türkiye saati)"
+    )
 
 
 # =========================
@@ -165,20 +269,16 @@ def analiz_yap():
 
         if son["Sinyal"] == "AL":
             st.success("🟢 AL")
+
         elif son["Sinyal"] == "SAT":
             st.error("🔴 SAT")
+
         else:
             st.warning("🟡 BEKLE")
 
         st.metric(
             "Son Altın Fiyatı",
             f"{son['Altın Fiyatı']:.2f} USD/ons"
-        )
-
-        st.caption(
-            "Son güncelleme: "
-            + turkiye_saati.strftime("%d.%m.%Y %H:%M:%S")
-            + " (Türkiye saati)"
         )
 
         st.info(
@@ -194,7 +294,7 @@ def analiz_yap():
 
 
 # =========================
-# YENİLEME
+# YENİLE
 # =========================
 
 if st.button("🔄 VERİYİ YENİLE"):
