@@ -11,14 +11,14 @@ st.set_page_config(
 )
 
 st.title("🟡 ALTIN ANALİZ BOTU")
-st.caption("XAU/USD • Ons Altın • Fiyat hareketi analizi")
+st.caption("Altın (GC=F) • Ons altın vadeli fiyat analizi")
 
 
 def analiz_yap():
 
     try:
         altin = yf.download(
-            "XAUUSD=X",
+            "GC=F",
             period="5d",
             interval="1h",
             auto_adjust=False,
@@ -26,7 +26,7 @@ def analiz_yap():
         )
 
         if altin.empty:
-            st.error("XAU/USD verisi alınamadı.")
+            st.error("Altın verisi alınamadı.")
             return
 
         if isinstance(altin.columns, pd.MultiIndex):
@@ -57,7 +57,7 @@ def analiz_yap():
 
         tablo.columns = [
             "Tarih",
-            "XAU/USD",
+            "Altın Fiyatı",
             "Açılış",
             "Ortalama",
             "Sinyal"
@@ -69,7 +69,7 @@ def analiz_yap():
             .dt.strftime("%d.%m.%Y %H:%M")
         )
 
-        tablo["XAU/USD"] = tablo["XAU/USD"].round(2)
+        tablo["Altın Fiyatı"] = tablo["Altın Fiyatı"].round(2)
         tablo["Açılış"] = tablo["Açılış"].round(2)
         tablo["Ortalama"] = tablo["Ortalama"].round(2)
 
@@ -91,8 +91,8 @@ def analiz_yap():
             st.warning("🟡 BEKLE")
 
         st.metric(
-            "Son XAU/USD Fiyatı",
-            f"{son['XAU/USD']:.2f} USD"
+            "Son Altın Fiyatı",
+            f"{son['Altın Fiyatı']:.2f} USD/ons"
         )
 
         turkiye_saati = datetime.now(
@@ -103,6 +103,11 @@ def analiz_yap():
             "Son güncelleme: "
             + turkiye_saati.strftime("%d.%m.%Y %H:%M:%S")
             + " (Türkiye saati)"
+        )
+
+        st.info(
+            "Not: GC=F, Yahoo Finance üzerindeki altın vadeli işlem verisidir. "
+            "Sinyaller teknik analiz amaçlıdır ve yatırım tavsiyesi değildir."
         )
 
     except Exception as hata:
